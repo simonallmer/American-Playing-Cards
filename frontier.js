@@ -564,7 +564,10 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                         </div>
                     `;
                 } else {
-                    div.innerHTML = `<img src="${getCardImageUrl(card.suit.id, card.val)}" alt="${card.suit.id} ${card.val}" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;">`;
+                    div.style.width = "90px";
+                    div.style.height = "124px";
+                    div.classList.add('has-design');
+                    div.innerHTML = `<img src="${getCardImageUrl(card.suit.id, card.val)}" alt="${card.suit.id} ${card.val}" style="width:100%;height:100%;display:block;object-fit:fill;">`;
                 }
                 this.els.allCardsGrid.appendChild(div);
             }
@@ -1246,7 +1249,8 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                     </div>
                 `;
             } else {
-                div.innerHTML = `<img src="${getCardImageUrl(card.suit.id, card.val)}" alt="${card.suit.id} ${card.val}" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;">`;
+                div.classList.add('has-design');
+                div.innerHTML = `<img src="${getCardImageUrl(card.suit.id, card.val)}" alt="${card.suit.id} ${card.val}" style="width:100%;height:100%;display:block;object-fit:fill;">`;
             }
 
             if (isClickable) {

@@ -2372,7 +2372,7 @@ body.asian-portrait .landing-logo-text {
 
         .card {
             width: 140px;
-            height: 210px;
+            height: 194px;
             border-radius: 12px;
             border: 3px solid #333;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
@@ -2385,6 +2385,17 @@ body.asian-portrait .landing-logo-text {
             user-select: none;
             position: relative;
             background-color: #111;
+        }
+
+        .card.has-design {
+            padding: 0;
+            border: none;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        .card.has-design.selected {
+            border: 2px solid var(--gold-bright);
         }
 
         .card.selected {
