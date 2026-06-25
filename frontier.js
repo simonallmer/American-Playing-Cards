@@ -59,6 +59,14 @@ function cardDisplayVal(val) {
     return val;
 }
 
+const CARD_IMG_SUIT_ORDER = ['INDUST_EAST', 'WEST_FRONTIER', 'DEEP_SOUTH', 'UPPER_SOUTH', 'BORDER'];
+const CARD_IMG_SUIT_NAMES = { INDUST_EAST: 'Clubs', WEST_FRONTIER: 'Spades', DEEP_SOUTH: 'Hearts', UPPER_SOUTH: 'Diamonds', BORDER: 'Stars' };
+function getCardImageUrl(suitId, val) {
+    const fileNum = (CARD_IMG_SUIT_ORDER.indexOf(suitId) * 10) + val;
+    const valStr = val === 10 ? 'Cypher' : String(val);
+    return `resources/cards/${String(fileNum).padStart(2, '0')}_${CARD_IMG_SUIT_NAMES[suitId]}_${valStr}.png`;
+}
+
 // --- Helper Functions ---
 function createDeck(edition = 'STANDARD') {
     let newDeck = [];
@@ -556,13 +564,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                         </div>
                     `;
                 } else {
-                    div.innerHTML = `
-                        <div class="card-corner ${card.val === 10 ? 'is-cypher' : card.val === 1 ? 'is-one' : ''}">${cardDisplayVal(card.val)}</div>
-                        <div class="card-center">
-                            <div class="card-val">${card.suit.symbol}</div>
-                        </div>
-                        <div class="card-corner bottom ${card.val === 10 ? 'is-cypher' : card.val === 1 ? 'is-one' : ''}">${cardDisplayVal(card.val)}</div>
-                    `;
+                    div.innerHTML = `<img src="${getCardImageUrl(card.suit.id, card.val)}" alt="${card.suit.id} ${card.val}" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;">`;
                 }
                 this.els.allCardsGrid.appendChild(div);
             }
@@ -1244,13 +1246,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                     </div>
                 `;
             } else {
-                div.innerHTML = `
-                    <div class="card-corner ${card.val === 10 ? 'is-cypher' : card.val === 1 ? 'is-one' : ''}">${cardDisplayVal(card.val)}</div>
-                    <div class="card-center">
-                        <div class="card-val">${card.suit.symbol}</div>
-                    </div>
-                    <div class="card-corner bottom ${card.val === 10 ? 'is-cypher' : card.val === 1 ? 'is-one' : ''}">${cardDisplayVal(card.val)}</div>
-                `;
+                div.innerHTML = `<img src="${getCardImageUrl(card.suit.id, card.val)}" alt="${card.suit.id} ${card.val}" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;">`;
             }
 
             if (isClickable) {
