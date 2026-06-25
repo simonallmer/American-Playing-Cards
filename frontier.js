@@ -650,12 +650,13 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         presQuizBtn.className = `toggle-btn ${this.currentGame === 'PRESIDENT_QUIZ' ? 'active' : ''}`;
         presQuizBtn.innerText = 'President Quiz';
 
-        const cowboyBtn = document.createElement('button');
-        cowboyBtn.className = 'toggle-btn';
-        cowboyBtn.innerText = 'Cowboy (TBA)';
-        cowboyBtn.style.opacity = '0.4';
-        cowboyBtn.style.cursor = 'not-allowed';
-        cowboyBtn.disabled = true;
+        const duelBtn = document.createElement('button');
+        duelBtn.className = 'toggle-btn';
+        duelBtn.innerText = 'Duel';
+        duelBtn.onclick = () => {
+            navigateTo('duel');
+            duelGame.showSetup();
+        };
 
         frontierBtn.onclick = () => {
             this.currentGame = 'FRONTIER';
@@ -705,7 +706,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         gameToggle.appendChild(frontierBtn);
         gameToggle.appendChild(presQuizBtn);
         gameToggle.appendChild(quizBtn);
-        gameToggle.appendChild(cowboyBtn);
+        gameToggle.appendChild(duelBtn);
         gameRow.appendChild(gameToggle);
 
         const editionRow = document.createElement('div');
