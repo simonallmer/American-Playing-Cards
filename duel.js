@@ -171,6 +171,25 @@ class DuelGame {
         this.startRound();
     }
 
+    startWithPlayers(playerConfigs) {
+        this.players = playerConfigs.map((cfg, i) => ({
+            name: cfg.name || `Player ${i + 1}`,
+            hand: [],
+            isComputer: cfg.isAI || false,
+            eliminated: false
+        }));
+        const deck = this.buildDeck();
+        this.drawPile = [...deck];
+        this.influenceHistory = [];
+        this.round = 0;
+        this.lastBystander = null;
+        this.players.forEach(p => {
+            for (let j = 0; j < 5; j++) p.hand.push(this.drawPile.pop());
+        });
+        this.influenceCard = this.drawPile.pop();
+        this.startRound();
+    }
+
     // ─── Round management ────────────────────────────────────────────
 
     activePlayers() {

@@ -651,11 +651,18 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         presQuizBtn.innerText = 'President Quiz';
 
         const duelBtn = document.createElement('button');
-        duelBtn.className = 'toggle-btn';
+        duelBtn.className = `toggle-btn ${this.currentGame === 'DUEL' ? 'active' : ''}`;
         duelBtn.innerText = 'Duel';
         duelBtn.onclick = () => {
-            navigateTo('duel');
-            duelGame.showSetup();
+            this.currentGame = 'DUEL';
+            duelBtn.classList.add('active');
+            frontierBtn.classList.remove('active');
+            quizBtn.classList.remove('active');
+            presQuizBtn.classList.remove('active');
+            editionRow.style.display = 'none';
+            countLabel.style.display = 'none';
+            countRow.style.display = 'none';
+            this.preparePlayerNames(2);
         };
 
         frontierBtn.onclick = () => {
@@ -663,12 +670,17 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             frontierBtn.classList.add('active');
             quizBtn.classList.remove('active');
             presQuizBtn.classList.remove('active');
+            duelBtn.classList.remove('active');
+            editionRow.style.display = '';
+            countLabel.style.display = '';
+            countRow.style.display = '';
             stdBtn.disabled = false;
             presBtn.disabled = false;
             stateBtn.disabled = false;
             stdBtn.style.opacity = '1';
             presBtn.style.opacity = '1';
             stateBtn.style.opacity = '1';
+            countRow.children[0].click();
         };
 
         quizBtn.onclick = () => {
@@ -676,7 +688,10 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             quizBtn.classList.add('active');
             frontierBtn.classList.remove('active');
             presQuizBtn.classList.remove('active');
-            // Lock in State Edition
+            duelBtn.classList.remove('active');
+            editionRow.style.display = '';
+            countLabel.style.display = '';
+            countRow.style.display = '';
             stateBtn.disabled = false;
             stateBtn.style.opacity = '1';
             this.edition = 'STATE';
@@ -685,6 +700,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             presBtn.disabled = true;
             stdBtn.style.opacity = '0.5';
             presBtn.style.opacity = '0.5';
+            countRow.children[0].click();
         };
 
         presQuizBtn.onclick = () => {
@@ -692,7 +708,10 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             presQuizBtn.classList.add('active');
             frontierBtn.classList.remove('active');
             quizBtn.classList.remove('active');
-            // Lock in President Edition
+            duelBtn.classList.remove('active');
+            editionRow.style.display = '';
+            countLabel.style.display = '';
+            countRow.style.display = '';
             presBtn.disabled = false;
             presBtn.style.opacity = '1';
             this.edition = 'PRESIDENT';
@@ -701,12 +720,13 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             stateBtn.disabled = true;
             stdBtn.style.opacity = '0.5';
             stateBtn.style.opacity = '0.5';
+            countRow.children[0].click();
         };
 
         gameToggle.appendChild(frontierBtn);
+        gameToggle.appendChild(duelBtn);
         gameToggle.appendChild(presQuizBtn);
         gameToggle.appendChild(quizBtn);
-        gameToggle.appendChild(duelBtn);
         gameRow.appendChild(gameToggle);
 
         const editionRow = document.createElement('div');
@@ -955,7 +975,11 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                     name: c.input.value.trim(),
                     isAI: c.isAI
                 }));
-                if (this.currentGame === 'STATE_QUIZ') {
+                if (this.currentGame === 'DUEL') {
+                    this.els.overlay.classList.remove('visible');
+                    navigateTo('duel');
+                    duelGame.startWithPlayers(finalPlayers);
+                } else if (this.currentGame === 'STATE_QUIZ') {
                     this.els.overlay.classList.remove('visible');
                     location.hash = '#state-quiz';
                     stateQuiz.initGame(finalPlayers);
