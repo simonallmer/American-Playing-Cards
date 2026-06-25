@@ -585,6 +585,8 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
     }
 
     showSetup() {
+        const gameMenuBtn = document.getElementById('frontier-game-menu-btn');
+        if (gameMenuBtn) gameMenuBtn.style.display = 'none';
         this.els.mainHud.style.display = 'none';
         this.els.playerStatusGrid.innerHTML = '';
         this.els.cardsContainer.innerHTML = '';
@@ -650,37 +652,17 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         presQuizBtn.className = `toggle-btn ${this.currentGame === 'PRESIDENT_QUIZ' ? 'active' : ''}`;
         presQuizBtn.innerText = 'President Quiz';
 
-        const duelBtn = document.createElement('button');
-        duelBtn.className = `toggle-btn ${this.currentGame === 'DUEL' ? 'active' : ''}`;
-        duelBtn.innerText = 'Duel';
-        duelBtn.onclick = () => {
-            this.currentGame = 'DUEL';
-            duelBtn.classList.add('active');
-            frontierBtn.classList.remove('active');
-            quizBtn.classList.remove('active');
-            presQuizBtn.classList.remove('active');
-            editionRow.style.display = 'none';
-            countLabel.style.display = 'none';
-            countRow.style.display = 'none';
-            this.preparePlayerNames(2);
-        };
-
         frontierBtn.onclick = () => {
             this.currentGame = 'FRONTIER';
             frontierBtn.classList.add('active');
             quizBtn.classList.remove('active');
             presQuizBtn.classList.remove('active');
-            duelBtn.classList.remove('active');
-            editionRow.style.display = '';
-            countLabel.style.display = '';
-            countRow.style.display = '';
             stdBtn.disabled = false;
             presBtn.disabled = false;
             stateBtn.disabled = false;
             stdBtn.style.opacity = '1';
             presBtn.style.opacity = '1';
             stateBtn.style.opacity = '1';
-            countRow.children[0].click();
         };
 
         quizBtn.onclick = () => {
@@ -688,10 +670,6 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             quizBtn.classList.add('active');
             frontierBtn.classList.remove('active');
             presQuizBtn.classList.remove('active');
-            duelBtn.classList.remove('active');
-            editionRow.style.display = '';
-            countLabel.style.display = '';
-            countRow.style.display = '';
             stateBtn.disabled = false;
             stateBtn.style.opacity = '1';
             this.edition = 'STATE';
@@ -700,7 +678,6 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             presBtn.disabled = true;
             stdBtn.style.opacity = '0.5';
             presBtn.style.opacity = '0.5';
-            countRow.children[0].click();
         };
 
         presQuizBtn.onclick = () => {
@@ -708,10 +685,6 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             presQuizBtn.classList.add('active');
             frontierBtn.classList.remove('active');
             quizBtn.classList.remove('active');
-            duelBtn.classList.remove('active');
-            editionRow.style.display = '';
-            countLabel.style.display = '';
-            countRow.style.display = '';
             presBtn.disabled = false;
             presBtn.style.opacity = '1';
             this.edition = 'PRESIDENT';
@@ -720,11 +693,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             stateBtn.disabled = true;
             stdBtn.style.opacity = '0.5';
             stateBtn.style.opacity = '0.5';
-            countRow.children[0].click();
         };
 
         gameToggle.appendChild(frontierBtn);
-        gameToggle.appendChild(duelBtn);
         gameToggle.appendChild(presQuizBtn);
         gameToggle.appendChild(quizBtn);
         gameRow.appendChild(gameToggle);
@@ -1032,6 +1003,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         if (actions) actions.innerHTML = '';
         
         this.els.overlay.classList.remove('visible');
+
+        const gameMenuBtn = document.getElementById('frontier-game-menu-btn');
+        if (gameMenuBtn) gameMenuBtn.style.display = 'block';
 
         const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4'];
 
