@@ -66,6 +66,9 @@
                 <button onclick="frontierGame.showAllCards()"
                         style="color: var(--text-color); font-weight: bold; letter-spacing: 1px;">ALL CARDS</button>
                 <hr style="border: none; border-top: 1px solid #333; margin: 10px 0;">
+                <button onclick="navigateTo('duel'); duelGame.showSetup();"
+                        style="color: var(--gold-bright); font-weight: bold; letter-spacing: 1px;">DUEL</button>
+                <hr style="border: none; border-top: 1px solid #333; margin: 10px 0;">
                 <a href="https://simonallmer.com/arcade"
                    style="text-decoration: none; display: block; width: 100%;">
                     <button style="color: var(--red-accent); border-color: rgba(185,28,28,0.3);">BACK TO ARCADE</button>
@@ -165,8 +168,21 @@
 
     </section>
 
+    <!-- DUEL -->
+    <section id="duel" class="view">
+        <div id="duel-setup"></div>
+        <div id="duel-board"></div>
+        <div id="duel-challenge"></div>
+        <div id="duel-gate"></div>
+        <div id="duel-card-select"></div>
+        <div id="duel-reveal"></div>
+        <div id="duel-gamble"></div>
+        <div id="duel-over"></div>
+        <div id="duel-rules"></div>
+    </section>
+
     <!-- STATE QUIZ -->
-    <section id="state-quiz" class="view" style="position: relative; background: #0a0a0b; overflow: hidden;">
+    <section id="state-quiz" class="view" style="background: #0a0a0b; overflow: hidden;">
         <div id="quiz-hud" class="hud" style="top: 25px; width: auto; left: 50%; transform: translateX(-50%); display: flex; gap: 30px; padding: 15px 40px; border-radius: 50px; background: rgba(20, 20, 25, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(212, 175, 55, 0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
             <div class="hud-item"><span class="label">Round</span><span class="value" id="quiz-round">1 / 5</span></div>
             <div class="hud-item"><span class="label">Pot</span><span class="value" style="color: #10b981;" id="quiz-pot">$0</span></div>
@@ -190,7 +206,7 @@
     </section>
 
     <!-- PRESIDENT QUIZ -->
-    <section id="president-quiz" class="view" style="position: relative; background: linear-gradient(135deg, #1f140e, #0a0604); overflow: hidden;">
+    <section id="president-quiz" class="view" style="background: linear-gradient(135deg, #1f140e, #0a0604); overflow: hidden;">
         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90vw; height: 85vh; background: #141f17; border-radius: 40px; border: 2px solid rgba(212, 175, 55, 0.1); box-shadow: inset 0 0 80px rgba(0,0,0,0.8), 0 20px 50px rgba(0,0,0,0.5);"></div>
         <div id="pres-quiz-hud" style="position: absolute; top: 50px; left: 50%; transform: translateX(-50%); display: flex; gap: 60px; font-family: 'Cinzel', serif; color: var(--gold-dim); letter-spacing: 3px; text-transform: uppercase; z-index: 10;">
             <div style="text-align: center;">Round<br><span id="pres-quiz-round" style="color: var(--gold-bright); font-size: 1.5rem;">1 / 5</span></div>
@@ -231,12 +247,13 @@
     <script src="states_data.js"></script>
     <script src="us_map_data.js"></script>
     <script src="frontier.js"></script>
+    <script src="duel.js"></script>
     <script src="state-quiz.js"></script>
     <script src="president-quiz.js"></script>
 
     <script>
         function navigateTo(view) {
-            ['frontier', 'state-quiz', 'president-quiz'].forEach(id => {
+            ['frontier', 'duel', 'state-quiz', 'president-quiz'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.toggle('active', id === view);
             });
@@ -245,8 +262,9 @@
 
         window.addEventListener('hashchange', () => {
             const hash = location.hash.replace('#', '');
-            if (hash === 'state-quiz' || hash === 'president-quiz') {
+            if (hash === 'state-quiz' || hash === 'president-quiz' || hash === 'duel') {
                 navigateTo(hash);
+                if (hash === 'duel') duelGame.showSetup();
             } else {
                 navigateTo('frontier');
                 frontierGame.showSetup();
