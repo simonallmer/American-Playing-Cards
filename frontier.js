@@ -652,11 +652,17 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         presQuizBtn.className = `toggle-btn ${this.currentGame === 'PRESIDENT_QUIZ' ? 'active' : ''}`;
         presQuizBtn.innerText = 'President Quiz';
 
+        const duelBtn = document.createElement('button');
+        duelBtn.className = `toggle-btn ${this.currentGame === 'DUEL' ? 'active' : ''}`;
+        duelBtn.innerText = 'Duel';
+
         frontierBtn.onclick = () => {
             this.currentGame = 'FRONTIER';
             frontierBtn.classList.add('active');
             quizBtn.classList.remove('active');
             presQuizBtn.classList.remove('active');
+            duelBtn.classList.remove('active');
+            editionRow.style.display = 'flex';
             stdBtn.disabled = false;
             presBtn.disabled = false;
             stateBtn.disabled = false;
@@ -670,6 +676,8 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             quizBtn.classList.add('active');
             frontierBtn.classList.remove('active');
             presQuizBtn.classList.remove('active');
+            duelBtn.classList.remove('active');
+            editionRow.style.display = 'flex';
             stateBtn.disabled = false;
             stateBtn.style.opacity = '1';
             this.edition = 'STATE';
@@ -685,6 +693,8 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             presQuizBtn.classList.add('active');
             frontierBtn.classList.remove('active');
             quizBtn.classList.remove('active');
+            duelBtn.classList.remove('active');
+            editionRow.style.display = 'flex';
             presBtn.disabled = false;
             presBtn.style.opacity = '1';
             this.edition = 'PRESIDENT';
@@ -695,7 +705,18 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             stateBtn.style.opacity = '0.5';
         };
 
+        duelBtn.onclick = () => {
+            this.currentGame = 'DUEL';
+            duelBtn.classList.add('active');
+            frontierBtn.classList.remove('active');
+            quizBtn.classList.remove('active');
+            presQuizBtn.classList.remove('active');
+            // Duel has no editions — hide the edition selector.
+            editionRow.style.display = 'none';
+        };
+
         gameToggle.appendChild(frontierBtn);
+        gameToggle.appendChild(duelBtn);
         gameToggle.appendChild(presQuizBtn);
         gameToggle.appendChild(quizBtn);
         gameRow.appendChild(gameToggle);
@@ -757,6 +778,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         editionToggle.appendChild(stateBtn);
         editionRow.appendChild(editionToggle);
 
+        // Duel has no editions — hide the edition selector when it's active.
+        if (this.currentGame === 'DUEL') editionRow.style.display = 'none';
+
         const countLabel = document.createElement('div');
         countLabel.innerText = "PLAYER COUNT";
         countLabel.style.fontSize = "0.7rem";
@@ -811,7 +835,14 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         rulesBtn.style.transition = "color 0.3s";
         rulesBtn.onmouseover = () => rulesBtn.style.color = "var(--gold-bright)";
         rulesBtn.onmouseout = () => rulesBtn.style.color = "var(--gold)";
-        rulesBtn.onclick = () => this.showRules();
+        rulesBtn.onclick = () => {
+            if (this.currentGame === 'DUEL') {
+                navigateTo('duel');
+                duelGame.showRules();
+            } else {
+                this.showRules();
+            }
+        };
 
         const credit = document.createElement('div');
         credit.innerText = "GAME DESIGN: SIMON ALLMER";

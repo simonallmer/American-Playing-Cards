@@ -586,7 +586,7 @@ class DuelGame {
         const el = document.getElementById('duel-rules');
         el.innerHTML = `
             <div class="dg-rules-box">
-                <button class="dg-link-btn" style="margin-bottom:20px;" onclick="duelGame.showSetup()">← Back to Setup</button>
+                <button class="dg-link-btn" style="margin-bottom:20px;" onclick="navigateTo('frontier'); frontierGame.currentGame='DUEL'; frontierGame.showSetup();">← Back to Setup</button>
                 <h1 class="dg-title">DUEL</h1>
                 <p class="dg-subtitle">A game of hidden information, public deception, and timing</p>
                 <div class="dg-rules-body">
