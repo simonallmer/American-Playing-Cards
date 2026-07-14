@@ -129,21 +129,29 @@ function createDeck(edition = 'STANDARD') {
 function evaluateHand(cards) {
     if (!cards || cards.length === 0) return { name: "Fold", score: 0, style: "color: #78716c;", displayValue: "0", type: 'FOLD' };
 
+    const n = cards.length;
     const sortedCards = [...cards].sort((a, b) => a.val - b.val);
-    const isPureFlush = cards.every(c => c.suit.id === cards[0].suit.id);
 
+    // --- Symbol / Side analysis ---
+    const isSymbol = cards.every(c => c.suit.id === cards[0].suit.id); // exact same suit (e.g. all Spades)
+    const isPureFlush = isSymbol; // kept for skirmish flavor below
+    const pureUnion = cards.every(c => c.suit.align === 'Union');
+    const pureConfed = cards.every(c => c.suit.align === 'Confederacy');
+    const isPureSide = pureUnion || pureConfed; // one side, zero neutral cards
     const isConfederate = cards.every(c => c.suit.align === 'Confederacy' || c.suit.align === 'Neutral');
     const isUnion = cards.every(c => c.suit.align === 'Union' || c.suit.align === 'Neutral');
-    const hasAllegiance = isConfederate || isUnion;
+    const hasAllegiance = isConfederate || isUnion; // one side, neutral tolerated
+    const isAllianceSide = hasAllegiance && !isPureSide; // one side + neutral mixed in
+    const isMixedSides = !hasAllegiance; // both Union and Confederacy present
 
-    // Purity Tiebreaker Logic
+    // Purity Tiebreaker / Skirmish Flavor Tag
     let purityBonus = 0;
     let purityTag = "";
-    if (cards.length > 1) {
+    if (n > 1) {
         if (isPureFlush) {
             purityBonus = 40;
             purityTag = " [Pure]";
-        } else if (cards.every(c => c.suit.align === 'Union') || cards.every(c => c.suit.align === 'Confederacy') || cards.every(c => c.suit.align === 'Neutral')) {
+        } else if (isPureSide || cards.every(c => c.suit.align === 'Neutral')) {
             purityBonus = 30;
             purityTag = " [Strict]";
         } else if (hasAllegiance) {
@@ -155,54 +163,26 @@ function evaluateHand(cards) {
         }
     }
 
+    // --- Run detection (linear or wrapping through the Cypher/1 circle) ---
     let isRun = false;
-    if (cards.length > 1) {
-        // Linear Run
+    if (n > 1) {
         let maxRun = 1, currentRun = 1;
         for (let i = 0; i < sortedCards.length - 1; i++) {
             if (sortedCards[i + 1].val === sortedCards[i].val + 1) currentRun++;
             else if (sortedCards[i + 1].val !== sortedCards[i].val) currentRun = 1;
             maxRun = Math.max(maxRun, currentRun);
         }
-        let linearRun = maxRun === cards.length;
-
-        // Circular Run (Wrap-around 10 to 1)
-        // Hand is already sorted by val.
-        // If it's a 10-1 wrap, it would look like [1, 2, ..., 10]
-        // Example for length 3: [1, 2, 10] or [1, 9, 10]
-        // But sorted: [1, 2, 10] -> 10, 1, 2. The gap is between 2 and 10.
-        // A better check for circular runs in a sorted array:
-        // A run exists if (sorted[i+1] - sorted[i] == 1) OR (sorted[0] == 1 AND sorted[last] == 10 AND some other logic)
-        // Actually, for any N cards to be a circular run, they must be distinct and 
-        // (max - min == N - 1) OR (if 1 and 10 are present, check the 'gap')
+        let linearRun = maxRun === n;
 
         if (linearRun) {
             isRun = true;
         } else {
-            // Circular check: must have 1 and 10
+            // Circular check: must span 1 and 10 (Cypher) with exactly one gap
             const values = sortedCards.map(c => c.val);
             if (values.includes(1) && values.includes(10)) {
-                // Find the rotation point where values[i+1] - values[i] > 1
-                // There should be exactly one such gap if it's a run
-                let gaps = 0;
-                for (let i = 0; i < values.length - 1; i++) {
-                    if (values[i + 1] - values[i] > 1) gaps++;
-                }
-                // Also check if the "outside" wrap is correct
-                // If gaps == 1, and the total span excluding that gap is correct
-                // The number of steps 'missing' in the linear sequence must match the wrap
-                // Example 3 cards: [1, 9, 10]. Gap at 1-9 is 8. Total elements: 10. 
-                // Wait, simpler: for N distinct cards, it's a circular run if
-                // after sorting, there is at most one index i where sorted[i+1] != sorted[i] + 1
-                // AND if that happens, the "remaining" values must be at the ends [1...x] and [y...10]
-                // and the total count x + (10 - y + 1) == N.
-                let breakPoint = -1;
                 let breaks = 0;
                 for (let i = 0; i < values.length - 1; i++) {
-                    if (values[i + 1] !== values[i] + 1) {
-                        breaks++;
-                        breakPoint = i;
-                    }
+                    if (values[i + 1] !== values[i] + 1) breaks++;
                 }
                 if (breaks === 1 && values[0] === 1 && values[values.length - 1] === 10) {
                     isRun = true;
@@ -215,36 +195,52 @@ function evaluateHand(cards) {
     cards.forEach(c => valCounts[c.val] = (valCounts[c.val] || 0) + 1);
     const maxValCount = Math.max(...Object.values(valCounts));
     const dominantVal = parseInt(Object.keys(valCounts).find(k => valCounts[k] === maxValCount));
+    const isKind = n > 1 && maxValCount === n; // ALL cards share the same value (e.g. a pair, or three of a kind)
 
-    const highCardVal = sortedCards[sortedCards.length - 1].val;
+    // Gleichstand / tiebreak: total sum of card values, Cypher = 10 (see rulebook Section 5)
+    const valueSum = cards.reduce((acc, c) => acc + c.val, 0);
 
-    // Scoring Hierarchy
-    if (cards.length === 5) {
-        if (maxValCount === 5) return { name: `Five of Rank ${dominantVal}`, score: 5300000000 + (dominantVal * 100) + purityBonus, style: "color: #e879f9; font-weight: 900;", tier: 'Tier 1' };
-        if (isPureFlush) return { name: "Pure 5-Card Alliance", score: 5200000000 + (highCardVal * 100) + purityBonus, style: "color: #fbbf24; font-weight: 900;", tier: 'Tier 1' };
-        if (hasAllegiance && isRun) return { name: `5-Card Coalition Series${purityTag}`, score: 5100000000 + (highCardVal * 100) + purityBonus, style: "color: #fb923c; font-weight: bold;", tier: 'Tier 1' };
-        if (isRun) return { name: `5-Card Campaign Series${purityTag}`, score: 5000000000 + (highCardVal * 100) + purityBonus, style: "color: #60a5fa; font-weight: bold;", tier: 'Tier 1' };
+    // --- Category (Hierarchy Tier 1-9, per the rulebook) ---
+    let stufe = 9, categoryLabel = "Chaos";
+    if (n > 1) {
+        if (isRun && isSymbol) { stufe = 1; categoryLabel = "Run + Symbol"; }
+        else if (isKind) { stufe = 2; categoryLabel = "Same Value"; }
+        else if (isRun && isPureSide) { stufe = 3; categoryLabel = "Run + Pure Color"; }
+        else if (isRun && isAllianceSide) { stufe = 4; categoryLabel = "Run + Color Alliance"; }
+        else if (isRun && isMixedSides) { stufe = 5; categoryLabel = "Mixed Run"; }
+        else if (isSymbol) { stufe = 6; categoryLabel = "Symbol"; }
+        else if (isPureSide) { stufe = 7; categoryLabel = "Pure Color"; }
+        else if (isAllianceSide) { stufe = 8; categoryLabel = "Color Alliance"; }
     }
 
-    if (cards.length === 4) {
-        if (maxValCount === 4) return { name: `Four of Rank ${dominantVal}${purityTag}`, score: 4300000000 + (dominantVal * 100) + purityBonus, style: "color: #c084fc; font-weight: bold;", tier: 'Tier 2' };
-        if (isPureFlush) return { name: "Pure 4-Card Alliance", score: 4200000000 + (highCardVal * 100) + purityBonus, style: "color: #34d399;", tier: 'Tier 2' };
-        if (hasAllegiance && isRun) return { name: `4-Card Coalition Series${purityTag}`, score: 4100000000 + (highCardVal * 100) + purityBonus, style: "color: #a3e635;", tier: 'Tier 2' };
-        if (isRun) return { name: `4-Card Campaign Series${purityTag}`, score: 4000000000 + (highCardVal * 100) + purityBonus, style: "color: #22d3ee;", tier: 'Tier 2' };
+    // --- Scoring Hierarchy: card count first, then Tier (category), then value sum ---
+    if (n >= 2 && stufe < 9) {
+        const countBase = { 5: 5000000000, 4: 4000000000, 3: 3000000000, 2: 2000000000 }[n];
+        const stufeBonus = (9 - stufe) * 10000000;
+        const styles = {
+            1: "color: #e879f9; font-weight: 900;",
+            2: "color: #c084fc; font-weight: bold;",
+            3: "color: #fbbf24; font-weight: 900;",
+            4: "color: #fb923c; font-weight: bold;",
+            5: "color: #60a5fa; font-weight: bold;",
+            6: "color: #34d399;",
+            7: "color: #6ee7b7;",
+            8: "color: #a3e635;",
+        };
+        const name = stufe === 2
+            ? `${n} of Rank ${dominantVal}`
+            : `${n}-Card ${categoryLabel}${purityTag}`;
+        return {
+            name,
+            score: countBase + stufeBonus + (valueSum * 100) + purityBonus,
+            style: styles[stufe],
+            tier: `Tier ${stufe}`,
+            stufe,
+            count: n
+        };
     }
 
-    if (cards.length === 3) {
-        if (maxValCount === 3) return { name: `Three of Rank ${dominantVal}${purityTag}`, score: 3300000000 + (dominantVal * 100) + purityBonus, style: "color: #fb7185;", tier: 'Tier 3' };
-        if (isPureFlush) return { name: "Pure 3-Card Alliance", score: 3200000000 + (highCardVal * 100) + purityBonus, style: "color: #6ee7b7;", tier: 'Tier 3' };
-        if (hasAllegiance && isRun) return { name: `3-Card Coalition Series${purityTag}`, score: 3100000000 + (highCardVal * 100) + purityBonus, style: "color: #bef264;", tier: 'Tier 3' };
-        if (isRun) return { name: `3-Card Campaign Series${purityTag}`, score: 3000000000 + (highCardVal * 100) + purityBonus, style: "color: #67e8f9;", tier: 'Tier 3' };
-    }
-
-    if (cards.length === 2) {
-        if (maxValCount === 2) return { name: `Pair of Rank ${dominantVal}${purityTag}`, score: 2000000000 + (dominantVal * 100) + purityBonus, style: "color: #d6d3d1;", tier: 'Tier 4' };
-    }
-
-    // --- Raw Skirmish Power ---
+    // --- Raw Skirmish Power (Chaos hands, and single cards) ---
     let skirmishScore = 0;
     let skirmishName = "";
     let style = "color: #a8a29e;";
@@ -254,20 +250,20 @@ function evaluateHand(cards) {
     const effectiveValues = cards.map(c => c.val === 1 ? maxVal : c.val);
     const hasOne = cards.some(c => c.val === 1 && maxVal > 1);
 
-    if (cards.length === 1) {
+    if (n === 1) {
         skirmishScore = cards[0].val;
         skirmishName = `Solo Force: Rank ${cards[0].val}`;
     } else if (isPureFlush) {
         skirmishScore = effectiveValues.reduce((acc, val) => acc * val, 1) * 2;
-        skirmishName = `Pure Skirmish (${cards.length})${hasOne ? ' [Imitation]' : ''}`;
+        skirmishName = `Pure Skirmish (${n})${hasOne ? ' [Imitation]' : ''}`;
         style = "color: #10b981; font-weight: bold;";
     } else if (hasAllegiance) {
         skirmishScore = effectiveValues.reduce((acc, val) => acc * val, 1);
-        skirmishName = `Coalition Skirmish (${cards.length})${purityTag}${hasOne ? ' [Imitation]' : ''}`;
+        skirmishName = `Coalition Skirmish (${n})${purityTag}${hasOne ? ' [Imitation]' : ''}`;
         style = "color: #84cc16; font-weight: bold;";
     } else {
         skirmishScore = effectiveValues.reduce((acc, val) => acc + val, 0);
-        skirmishName = `Divided Skirmish (${cards.length})${hasOne ? ' [Imitation]' : ''}`;
+        skirmishName = `Divided Skirmish (${n})${hasOne ? ' [Imitation]' : ''}`;
         style = "color: #f87171; font-weight: bold;";
     }
 
@@ -275,7 +271,9 @@ function evaluateHand(cards) {
         name: skirmishName,
         score: (skirmishScore * 100) + purityBonus,
         style: style,
-        tier: 'Tier 5',
+        tier: 'Tier 9',
+        stufe: 9,
+        count: n,
         power: skirmishScore.toLocaleString()
     };
 }
@@ -297,6 +295,9 @@ class FrontierGame {
         this.gameHistory = [];
 
         this.selectedCardIndices = [];
+        this.marketCard = null;
+        this.marketCardSelected = false;
+        this.headsUpFinalTurn = false;
         this.phase = 'SETUP'; // SETUP, TRANSITION, PLAYING, ROUND_OVER, GAME_OVER
         this.currentGame = 'FRONTIER';
 
@@ -468,14 +469,20 @@ class FrontierGame {
                     <p>The winner is the player with the <strong>Most Cash</strong> at the end of Round 5!</p>
                     <p><strong>Split Pots:</strong> If two or more commanders deploy hands of identical strength, the Pot is divided equally. Any remaining coin ($1) is awarded to the first tied commander in the turn order.</p>
                     
-                    <p><strong>Hierarchy (Superior Volume Prevails):</strong> A configuration deploying a greater number of cards universally overcomes one deploying fewer.</p>
+                    <p><strong>Hierarchy:</strong> More cards always beats fewer cards. Only when two commanders deploy the <strong>same number of cards</strong> does the Tier (category) below decide between them.</p>
                     <ul style="background: rgba(255,255,255,0.03); padding: 20px; border: 1px solid #333; list-style: none; font-size: 0.85rem;">
-                        <li><strong style="color: #e879f9;">Tier 1:</strong> 5 of a Rank, Pure Suit, Coalition (Alliance), or Campaign (Sequence)</li>
-                        <li><strong style="color: #fb923c;">Tier 2:</strong> 4 of a Rank, Pure, Coalition, or Campaign</li>
-                        <li><strong style="color: #c084fc;">Tier 3:</strong> 3 of a Rank, Pure, Coalition, or Campaign</li>
-                        <li><strong style="color: #34d399;">Tier 4:</strong> Pairs</li>
-                        <li><strong style="color: #a3e635;">Tier 5 (Skirmishes):</strong> Unmatched cards. Pure (Product x 2), Coalition (Product), Divided (Sum). <strong>Rank I</strong> imitates the highest card (e.g., ⊘-I-2 results in x10 strength when pure). <strong>Cypher</strong> is worth 10.</li>
+                        <li><strong style="color: #e879f9;">Tier 1 — Run + Symbol:</strong> A Sequence, all one Symbol (e.g. Spades)</li>
+                        <li><strong style="color: #c084fc;">Tier 2 — Same Value:</strong> All cards share a Rank (e.g. a pair)</li>
+                        <li><strong style="color: #fbbf24;">Tier 3 — Run + Pure Color:</strong> A Sequence, one Alliance, no Wildcards</li>
+                        <li><strong style="color: #fb923c;">Tier 4 — Run + Color Alliance:</strong> A Sequence, one Alliance mixed with Wildcards</li>
+                        <li><strong style="color: #60a5fa;">Tier 5 — Mixed Run:</strong> A Sequence spanning both Alliances</li>
+                        <li><strong style="color: #34d399;">Tier 6 — Symbol:</strong> All one Symbol, no Sequence</li>
+                        <li><strong style="color: #6ee7b7;">Tier 7 — Pure Color:</strong> One Alliance, no Wildcards, no Sequence</li>
+                        <li><strong style="color: #a3e635;">Tier 8 — Color Alliance:</strong> One Alliance mixed with Wildcards, no Sequence</li>
+                        <li><strong style="color: #a8a29e;">Tier 9 — Chaos (Skirmish):</strong> None of the above. Resolved by raw Power: Pure (Product x 2), Coalition (Product), Divided (Sum). <strong>Rank I</strong> imitates the highest card. <strong>Cypher</strong> is worth 10.</li>
                     </ul>
+                    <p><strong>Twin Special Case:</strong> 2 cards of equal Rank can never be "Symbol" (each Symbol has every Rank only once) — they're judged as Same Value (Tier 2) instead.</p>
+                    <p><strong>Ties within a Tier:</strong> The total sum of card values decides (Cypher = 10).</p>
                     <p style="text-align: center; margin-top: 3rem; font-size: 0.7rem; opacity: 0.5; letter-spacing: 2px;">DESIGN: SIMON ALLMER</p>
                 </div>
             `;
@@ -1071,11 +1078,16 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             p.hand = this.deck.splice(0, 1);
         });
 
+        // Market Card: top of the draw pile, revealed before the first bet, usable by any player.
+        this.marketCard = this.deck.length > 0 ? this.deck.shift() : null;
+        this.marketCardSelected = false;
+
         this.roundActivePlayers = this.players
             .map((p, i) => (p.status === 'ACTIVE' ? i : -1))
             .filter(idx => idx !== -1);
         this.roundPlays = [];
         this.roundBet = 0;
+        this.headsUpFinalTurn = false;
 
         // Ensure starting player is not bankrupt
         this.activePlayerId = 0;
@@ -1112,11 +1124,13 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
 
         this.els.overlayTitle.innerText = `PASS TO ${player.name.toUpperCase()}`;
         this.els.overlayTitle.style.color = player.color.hex || 'var(--gold)';
-        this.els.overlayDesc.innerText = `When ready, click below to reveal Round ${this.currentRoundNum} hand.`;
+        this.els.overlayDesc.innerText = this.headsUpFinalTurn
+            ? `Your opponent raised. Click below to see the final call.`
+            : `When ready, click below to reveal Round ${this.currentRoundNum} hand.`;
 
         const btn = document.getElementById('overlay-main-btn');
         btn.style.display = 'block';
-        btn.innerText = "REVEAL CARDS";
+        btn.innerText = this.headsUpFinalTurn ? "CONTINUE" : "REVEAL CARDS";
         btn.onclick = () => this.startTurn();
 
         this.els.overlay.classList.add('visible');
@@ -1131,6 +1145,11 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         this.els.overlay.classList.add('visible');
         document.getElementById('overlay-main-btn').style.display = 'none';
 
+        if (this.headsUpFinalTurn) {
+            this.executeAIHeadsUpFinalTurn(player);
+            return;
+        }
+
         // Phase 1: Analyzing Hand
         setTimeout(() => {
             this.els.overlayDesc.innerText = "Evaluating hand strength and alliance potential...";
@@ -1139,7 +1158,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                 // Phase 2: Selecting Cards
                 const bestSelection = this.getAISelection(player);
                 this.selectedCardIndices = bestSelection.indices;
-                this.els.overlayDesc.innerText = `Selecting ${bestSelection.indices.length} card${bestSelection.indices.length > 1 ? 's' : ''} for the engagement...`;
+                this.marketCardSelected = bestSelection.useMarket;
+                const totalCards = bestSelection.indices.length + (bestSelection.useMarket ? 1 : 0);
+                this.els.overlayDesc.innerText = `Selecting ${totalCards} card${totalCards > 1 ? 's' : ''} for the engagement...`;
 
                 setTimeout(() => {
                     // Phase 3: Deciding Action
@@ -1173,24 +1194,64 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         }, 1000);
     }
 
+    // Heads-up (2-player) only: AI's final call-or-fold response to a raise — no card
+    // selection (already committed) and no further raising.
+    executeAIHeadsUpFinalTurn(player) {
+        this.els.overlayDesc.innerText = "Weighing the final call...";
+
+        setTimeout(() => {
+            const myPlay = this.roundPlays.find(p => p.playerId === this.activePlayerId);
+            const otherPlay = this.roundPlays.find(p => p.playerId !== this.activePlayerId);
+            const diff = Math.max(0, Math.min(player.cash, otherPlay.amount - myPlay.amount));
+            const handEval = evaluateHand(myPlay.cards);
+            const decision = this.getAIBettingDecision(player, handEval);
+            const willFold = decision.action === 'FOLD';
+
+            this.els.overlayDesc.innerText = willFold
+                ? "Decided to retreat from the current round."
+                : `Calls the raise for $${diff}.`;
+
+            setTimeout(() => {
+                this.els.overlay.classList.remove('visible');
+                if (willFold) {
+                    this.executeHeadsUpFinalFold();
+                } else {
+                    this.executeHeadsUpFinalCall();
+                }
+                this.setMessage(`<div style="color: ${player.color.hex}; font-weight: bold;">${player.name} ${willFold ? 'folds' : `calls $${diff}`}.</div>`);
+            }, 800);
+        }, 1000);
+    }
+
     getAISelection(player) {
-        // Simple logic: return all cards if they form a good hand, 
+        // Simple logic: return all cards if they form a good hand,
         // or find the subset with highest score.
         // For AI, we'll just check the full hand first, then pairs.
         const fullEval = evaluateHand(player.hand);
         let bestIndices = player.hand.map((_, i) => i);
         let bestEval = fullEval;
+        let useMarket = false;
 
-        // For simplicity in this 'average' AI, it plays its whole hand if it's better than Tier 5
+        // Consider adding the Market Card to the full hand, if one is available.
+        if (this.marketCard) {
+            const withMarketEval = evaluateHand([...player.hand, this.marketCard]);
+            if (withMarketEval.score > bestEval.score) {
+                bestEval = withMarketEval;
+                useMarket = true;
+            }
+        }
+
+        // For simplicity in this 'average' AI, it plays its whole hand if it's better than Chaos (Tier 9)
         // Otherwise it plays its highest card.
-        if (fullEval.tier === 'Tier 5') {
-            const highCardIdx = player.hand.reduce((maxIdx, card, idx, arr) => 
+        if (bestEval.tier === 'Tier 9') {
+            const highCardIdx = player.hand.reduce((maxIdx, card, idx, arr) =>
                 card.val > arr[maxIdx].val ? idx : maxIdx, 0);
             bestIndices = [highCardIdx];
             bestEval = evaluateHand([player.hand[highCardIdx]]);
+            useMarket = false;
         }
 
-        return { indices: bestIndices, eval: bestEval };
+        return { indices: bestIndices, eval: bestEval, useMarket };
     }
 
     getAIBettingDecision(player, handEval) {
@@ -1202,25 +1263,25 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             : 0;
         const maxBetAllowed = Math.min(5, maxOtherCash);
 
+        // Confidence based on Tier (category) and card count, per the Section 5 hierarchy
+        const stufe = handEval.stufe || 9;
+        const count = handEval.count || 1;
+        let confidence;
+        if (stufe === 9) {
+            confidence = 0.1;
+        } else {
+            const countConfidence = { 5: 1.0, 4: 0.85, 3: 0.65, 2: 0.45 }[count] || 0.3;
+            confidence = Math.min(1, countConfidence + (9 - stufe) * 0.01);
+        }
+
         // Average risk-averse logic
         if (isFirstPlayer) {
-            if (handEval.tier === 'Tier 1' || handEval.tier === 'Tier 2') {
+            if (confidence > 0.8) {
                 return { action: 'BET', amount: Math.min(player.cash, 3) };
-            }
-            if (handEval.tier === 'Tier 3' || handEval.tier === 'Tier 4') {
-                return { action: 'BET', amount: Math.min(player.cash, 1) };
             }
             return { action: 'BET', amount: Math.min(player.cash, 1) };
         } else {
             const callAmount = Math.min(player.cash, this.roundBet);
-            
-            // Confidence based on Tier
-            let confidence = 0;
-            if (handEval.tier === 'Tier 1') confidence = 1.0;
-            else if (handEval.tier === 'Tier 2') confidence = 0.9;
-            else if (handEval.tier === 'Tier 3') confidence = 0.7;
-            else if (handEval.tier === 'Tier 4') confidence = 0.4;
-            else confidence = 0.1;
 
             // Decision
             if (confidence > 0.8) {
@@ -1243,8 +1304,65 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
 
     startTurn() {
         this.els.overlay.classList.remove('visible');
+        if (this.headsUpFinalTurn) {
+            this.phase = 'HEADS_UP_CALL';
+            this.renderHeadsUpFinalCall();
+            return;
+        }
         this.phase = 'PLAYING';
         this.selectedCardIndices = [];
+        this.marketCardSelected = false;
+        this.renderPlaying();
+    }
+
+    // Heads-up (2-player) only: the last player raised, so the opener gets one final
+    // call-or-fold turn — no further raising — before the showdown.
+    renderHeadsUpFinalCall() {
+        const player = this.players[this.activePlayerId];
+        const myPlay = this.roundPlays.find(p => p.playerId === this.activePlayerId);
+        const otherPlay = this.roundPlays.find(p => p.playerId !== this.activePlayerId);
+        const opponent = this.players[otherPlay.playerId];
+        const diff = Math.max(0, Math.min(player.cash, otherPlay.amount - myPlay.amount));
+
+        this.updateHUD();
+        this.updatePlayerPods();
+        this.els.mulliganBtn.style.display = 'none';
+        this.renderCards(player.hand, false);
+        this.els.controlsArea.style.display = 'flex';
+
+        this.setMessage(`${opponent.name} raised to $${otherPlay.amount}. Call or fold — no further raises.`);
+
+        let controlsHTML = `<button class="action-btn call-btn" onclick="frontierGame.executeHeadsUpFinalCall()">CALL $${diff}</button>`;
+        controlsHTML += `<button class="danger-btn" onclick="frontierGame.executeHeadsUpFinalFold()">FOLD</button>`;
+        this.els.controlsArea.innerHTML = controlsHTML;
+    }
+
+    executeHeadsUpFinalCall() {
+        const player = this.players[this.activePlayerId];
+        const myPlay = this.roundPlays.find(p => p.playerId === this.activePlayerId);
+        const otherPlay = this.roundPlays.find(p => p.playerId !== this.activePlayerId);
+        const diff = Math.max(0, Math.min(player.cash, otherPlay.amount - myPlay.amount));
+
+        player.cash -= diff;
+        this.pot += diff;
+        myPlay.amount += diff;
+        this.roundBet = Math.max(this.roundBet, myPlay.amount);
+
+        this.headsUpFinalTurn = false;
+        this.advanceRound();
+    }
+
+    executeHeadsUpFinalFold() {
+        this.roundActivePlayers = this.roundActivePlayers.filter(idx => idx !== this.activePlayerId);
+        this.headsUpFinalTurn = false;
+        this.advanceRound();
+    }
+
+    toggleMarketCard() {
+        if (this.phase !== 'PLAYING' || !this.marketCard) return;
+        const player = this.players[this.activePlayerId];
+        if (player.isAI) return;
+        this.marketCardSelected = !this.marketCardSelected;
         this.renderPlaying();
     }
 
@@ -1324,8 +1442,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             : 0;
         const maxBetAllowed = Math.min(5, maxOtherCash);
 
-        // Evaluate Selection
-        const selectedCards = this.selectedCardIndices.map(i => player.hand[i]);
+        // Evaluate Selection (including the Market Card, if the player has chosen to use it)
+        const ownSelectedCards = this.selectedCardIndices.map(i => player.hand[i]);
+        const selectedCards = (this.marketCardSelected && this.marketCard) ? [...ownSelectedCards, this.marketCard] : ownSelectedCards;
         let handEval = null;
         if (selectedCards.length > 0) {
             handEval = evaluateHand(selectedCards);
@@ -1335,7 +1454,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
 
         if (isFirstPlayer) {
             if (handEval) {
-                const details = handEval.tier === 'Tier 5' ? `Power: ${handEval.power}` : handEval.name;
+                const details = handEval.tier === 'Tier 9' ? `Power: ${handEval.power}` : handEval.name;
                 this.setMessage(`<div style="font-size: 1.8rem; font-weight: bold; color: var(--gold-bright);">${handEval.tier}</div><div style="font-size: 1rem; opacity: 0.8;">${details}</div>`);
             } else {
                 this.setMessage(`Select cards to play and set the bet.`);
@@ -1348,7 +1467,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             controlsHTML += `<button class="danger-btn" onclick="frontierGame.executeFold()">FOLD</button>`;
         } else {
             if (handEval) {
-                const details = handEval.tier === 'Tier 5' ? `Power: ${handEval.power}` : handEval.name;
+                const details = handEval.tier === 'Tier 9' ? `Power: ${handEval.power}` : handEval.name;
                 this.setMessage(`<div style="font-size: 1.8rem; font-weight: bold; color: var(--gold-bright);">${handEval.tier}</div><div style="font-size: 1rem; opacity: 0.8;">${details}</div>`);
             } else {
                 this.setMessage(`Match the bet, raise, or retreat.`);
@@ -1359,7 +1478,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             const callDisabled = (this.selectedCardIndices.length === 0 || player.cash < callAmount) ? 'disabled' : '';
             controlsHTML += `<button class="action-btn call-btn" ${callDisabled} onclick="frontierGame.executePlay(${callAmount})">CALL $${callAmount}</button>`;
 
-            if (!isLastPlayer) {
+            // In heads-up (2-player) games, the last player may still raise once — the opener
+            // then gets a final call-or-fold turn (see the heads-up final-call flow below).
+            if (!isLastPlayer || this.players.length === 2) {
                 for (let b = this.roundBet + 1; b <= maxBetAllowed; b++) {
                     const raiseDisabled = (this.selectedCardIndices.length === 0 || player.cash < b) ? 'disabled' : '';
                     controlsHTML += `<button class="action-btn raise-btn" ${raiseDisabled} onclick="frontierGame.executePlay(${b})">RAISE $${b}</button>`;
@@ -1409,17 +1530,22 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
 
         if (player.cash < amount) return;
 
-        const cardsToPlay = this.selectedCardIndices.map(i => player.hand[i]);
+        const ownCards = this.selectedCardIndices.map(i => player.hand[i]);
+        const usedMarketCard = !!(this.marketCardSelected && this.marketCard);
+        // The Market Card is shared and stays in play for other players this round —
+        // only the player's own cards get discarded here (see advanceToNextRound).
+        const cardsToPlay = usedMarketCard ? [...ownCards, this.marketCard] : ownCards;
         const remainingHand = player.hand.filter((_, i) => !this.selectedCardIndices.includes(i));
 
-        this.discardPile.push(...cardsToPlay);
+        this.discardPile.push(...ownCards);
 
         player.hand = remainingHand;
         player.cash -= amount;
         this.pot += amount;
 
-        this.roundPlays.push({ playerId: this.activePlayerId, cards: cardsToPlay, amount });
+        this.roundPlays.push({ playerId: this.activePlayerId, cards: cardsToPlay, amount, usedMarketCard });
         this.roundBet = Math.max(this.roundBet, amount);
+        this.marketCardSelected = false;
         // Removed obsolete save call
 
         this.advanceRound();
@@ -1431,6 +1557,19 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
     }
 
     advanceRound() {
+        // Heads-up (2-player) only: if the last player just raised, the opener gets one
+        // final call-or-fold turn before the showdown — no further raising.
+        if (this.players.length === 2 && !this.headsUpFinalTurn && this.roundActivePlayers.length === 2 && this.roundPlays.length === 2) {
+            const [firstPlay, secondPlay] = this.roundPlays;
+            if (secondPlay.amount > firstPlay.amount) {
+                this.headsUpFinalTurn = true;
+                this.activePlayerId = firstPlay.playerId;
+                this.phase = 'TRANSITION';
+                this.renderTransition();
+                return;
+            }
+        }
+
         if (this.roundActivePlayers.length <= 1 || this.roundPlays.length === this.roundActivePlayers.length) {
             // Showdown
             let evaluatedPlays = this.roundPlays.map(p => ({ ...p, result: evaluateHand(p.cards) }));
@@ -1511,9 +1650,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
                 const res = p.result;
                 const isWinner = roundResult.winnerIds.includes(p.playerId);
 
-                let cardsHtml = p.cards.map(c => `<div class="card-mini suit-${c.suit.id}"><span class="card-val ${c.val === 10 ? 'is-cypher' : ''}" style="color:${c.suit.color}">${cardDisplayVal(c.val)}</span></div>`).join('');
+                let cardsHtml = p.cards.map(c => `<div class="card-mini suit-${c.suit.id}"><span class="card-val ${c.val === 10 ? 'is-cypher' : ''}" style="color:${c.suit.color}">${cardDisplayVal(c.val)}</span><span class="card-mini-suit-icon" style="color:${c.suit.color}">${c.suit.symbol}</span></div>`).join('');
 
-                const details = res.tier === 'Tier 5' ? `Power: ${res.power}` : res.name;
+                const details = res.tier === 'Tier 9' ? `Power: ${res.power}` : res.name;
 
                 let html = `
                     <div class="history-item" style="${isWinner ? 'background: rgba(212,175,55,0.1); border-left: 3px solid var(--gold); border-radius: 5px;' : ''}">
@@ -1547,6 +1686,11 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         const nextRound = this.currentRoundNum + 1;
         const targetHandSize = nextRound;
 
+        // The outgoing Market Card (used or not) is discarded along with played cards.
+        if (this.marketCard) this.discardPile.push(this.marketCard);
+        this.marketCard = null;
+        this.marketCardSelected = false;
+
         let allAvailableCards = [...this.deck, ...this.discardPile];
         for (let i = allAvailableCards.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -1571,6 +1715,9 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
             }
         });
 
+        // Reveal a new Market Card for the upcoming round.
+        this.marketCard = allAvailableCards.length > 0 ? allAvailableCards.shift() : null;
+
         this.currentRoundNum = nextRound;
         this.roundActivePlayers = this.players
             .map((p, i) => (p.status === 'ACTIVE' ? i : -1))
@@ -1582,6 +1729,7 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
 
         this.roundPlays = [];
         this.roundBet = 0;
+        this.headsUpFinalTurn = false;
         this.pot = 0;
         this.deck = allAvailableCards;
         this.discardPile = [];
@@ -1652,6 +1800,26 @@ if (this.edition === 'PRESIDENT' || this.edition === 'STATE') div.classList.add(
         document.getElementById('pot-display').innerText = `$${this.pot}`;
         document.getElementById('current-bet-display').innerText = `$${this.roundBet}`;
         document.getElementById('deck-display').innerText = this.deck.length;
+
+        const marketHud = document.getElementById('market-card-hud');
+        const marketDisplay = document.getElementById('market-card-display');
+        if (marketHud && marketDisplay) {
+            if (this.marketCard && this.currentGame === 'FRONTIER') {
+                marketHud.style.display = 'flex';
+                const activePlayer = this.players[this.activePlayerId];
+                const isInteractive = this.phase === 'PLAYING' && activePlayer && !activePlayer.isAI;
+                const c = this.marketCard;
+                const selectedStyle = this.marketCardSelected
+                    ? 'outline: 2px solid var(--gold-bright); border-radius: 4px;'
+                    : '';
+                marketDisplay.innerHTML = `<div class="card-mini suit-${c.suit.id}" style="cursor:${isInteractive ? 'pointer' : 'default'}; ${selectedStyle}" title="${isInteractive ? 'Click to include in your combination' : 'Market Card'}"><span class="card-val ${c.val === 10 ? 'is-cypher' : ''}" style="color:${c.suit.color}">${cardDisplayVal(c.val)}</span><span class="card-mini-suit-icon" style="color:${c.suit.color}">${c.suit.symbol}</span></div>`;
+                marketDisplay.onclick = isInteractive ? () => this.toggleMarketCard() : null;
+            } else {
+                marketHud.style.display = 'none';
+                marketDisplay.innerHTML = '';
+                marketDisplay.onclick = null;
+            }
+        }
     }
 
     updatePlayerPods() {
