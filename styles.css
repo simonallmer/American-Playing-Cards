@@ -2851,34 +2851,76 @@ body.asian-portrait .landing-logo-text {
             display: flex;
         }
 
-        .mulligan-btn {
-            background: none;
-            border: 1px solid #444;
-            color: #888;
-            font-family: 'Cinzel', serif;
-            font-size: 0.8rem;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 8px 16px;
-            border-radius: 4px;
-            margin-top: 15px;
-            transition: all 0.3s;
+        /* Frontier: Table Cards above the player's own cards */
+        .frontier-row {
+            flex-basis: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
-        .mulligan-btn:hover {
-            color: #ccc;
-            border-color: #888;
-            background: rgba(255, 255, 255, 0.05);
+        .frontier-row-label {
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--gold);
         }
 
-        .mulligan-btn:disabled {
-            color: #333;
-            border-color: #333;
-            cursor: not-allowed;
-            background: transparent;
-            text-decoration: line-through;
+        .frontier-row-cards {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            padding-top: 20px; /* room for selected cards, which lift by 20px */
         }
+
+        .frontier-row .card.selected {
+            box-shadow: 0 0 0 3px var(--gold-bright), 0 10px 30px rgba(0, 0, 0, 0.9);
+        }
+
+        .frontier-row-empty {
+            color: #555;
+            padding: 20px;
+        }
+
+        .card.table-card {
+            width: 104px;
+            height: 144px;
+        }
+
+        .card-mini.from-table {
+            outline: 1px dashed #888;
+            outline-offset: 1px;
+        }
+
+        .dealer-tag {
+            font-size: 0.6rem;
+            background: var(--gold);
+            color: #111;
+            padding: 2px 4px;
+            border-radius: 2px;
+            margin-left: 5px;
+            vertical-align: middle;
+            font-weight: bold;
+        }
+
+        .wager-stepper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .wager-stepper .action-btn {
+            padding: 8px 14px;
+        }
+
+        .wager-value {
+            min-width: 48px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--gold-bright);
+        }
+
     
         /* Frontier Burger Menu */
         #frontier-menu-btn {
@@ -5183,3 +5225,213 @@ body:has(#president-quiz.active) #permanent-demo-timer {
 .dg-rules-body ol { margin: 4px 0; padding-left: 20px; }
 .dg-rules-body li { margin-bottom: 4px; }
 .dg-rules-body strong { color: #fff; }
+
+/* ============================================================
+   STATE QUIZ — city markers, pan/zoom controls, touch guessing
+   ============================================================ */
+
+/* The HUD sits in normal flow with a 32px margin, which used to push the map
+   container down far enough to clip Florida, Alaska and Hawaii off the bottom.
+   Take the map out of flow so it always fills the section. */
+#quiz-map-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+#map-svg-wrapper {
+    overflow: hidden;
+    touch-action: none;          /* we drive pan/zoom ourselves */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#quiz-map-svg { display: block; }
+
+/* --- City markers ------------------------------------------------------ */
+/* Sizes below are in map units; state-quiz.js counter-scales each marker so
+   the rendered result is a constant number of CSS pixels at any zoom. */
+
+#quiz-city-layer .city-dot {
+    fill: rgba(226, 232, 240, 0.9);
+    stroke: rgba(10, 10, 11, 0.9);
+    stroke-width: 0.6;
+}
+
+#quiz-city-layer .city-dot.is-capital {
+    fill: var(--gold-bright, #d4af37);
+    stroke: rgba(10, 10, 11, 0.9);
+    stroke-width: 0.7;
+}
+
+#quiz-city-layer .city-label {
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 10px;             /* must match FONT_UNITS in state-quiz.js */
+    font-weight: 600;
+    letter-spacing: 0.15px;
+    fill: #dbe2ea;
+    stroke: rgba(8, 8, 10, 0.85);
+    stroke-width: 2.6;
+    paint-order: stroke fill;
+    dominant-baseline: middle;
+    /* No text-anchor here on purpose: a CSS declaration outranks the
+       presentation attribute, and layoutCities() flips the anchor per label. */
+}
+
+#quiz-city-layer .city-label.is-major {
+    fill: #ffffff;
+    font-weight: 700;
+}
+
+/* --- Zoom controls ----------------------------------------------------- */
+
+#quiz-zoom-controls {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;               /* touch / small screens only */
+    flex-direction: column;
+    gap: 8px;
+    z-index: 20;
+}
+
+#quiz-zoom-controls button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    background: rgba(20, 20, 25, 0.9);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: var(--gold-bright, #d4af37);
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+#quiz-zoom-controls button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* --- Tap-then-confirm bar (touch only) --------------------------------- */
+
+#quiz-confirm-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Lives in #state-quiz, not the map container, so it paints above the
+       target card rather than inside the map's stacking context. */
+    z-index: 60;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: rgba(12, 12, 14, 0.94);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+#quiz-cancel-btn {
+    flex: 0 0 auto;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: #cbd5e1;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#quiz-confirm-btn {
+    flex: 1 1 auto;
+    height: 46px;
+    border: none;
+    border-radius: 12px;
+    background: var(--gold-bright, #d4af37);
+    color: #0a0a0b;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+    #quiz-zoom-controls { display: flex; }
+}
+
+/* --- Phone layout ------------------------------------------------------ */
+
+@media (max-width: 768px) {
+    /* The back-to-menu button is pinned top-left and used to sit on top of the
+       HUD pill; drop the pill below it. */
+    #quiz-hud {
+        top: 56px !important;
+    }
+
+    #quiz-map-container {
+        padding: 108px 6px 92px 6px !important;
+    }
+
+    #map-svg-wrapper {
+        height: 100% !important;
+        max-width: none !important;
+    }
+
+    #quiz-zoom-controls {
+        right: 8px;
+        top: auto;
+        bottom: 10px;
+        transform: none;
+    }
+
+    #quiz-zoom-controls button {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+
+    #quiz-card-display {
+        bottom: 10px !important;
+        left: 10px !important;
+        transform: scale(0.46);
+        transform-origin: bottom left;
+    }
+
+    /* Whose turn it is moves up under the HUD, which leaves the bottom strip
+       to the card, the confirm bar and the zoom buttons. */
+    #quiz-player-turn {
+        top: 128px !important;
+        bottom: auto !important;
+    }
+
+    #quiz-current-player-name {
+        font-size: 1.05rem !important;
+        letter-spacing: 1px !important;
+    }
+
+    /* A floating bar that clears the card on the left and the zoom stack on
+       the right, instead of a full-bleed strip on top of both. */
+    #quiz-confirm-bar {
+        left: 74px;
+        right: 56px;
+        bottom: 10px;
+        padding: 0;
+        gap: 8px;
+        border: 1px solid rgba(212, 175, 55, 0.25);
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    #quiz-cancel-btn { width: 42px; height: 42px; border: none; border-radius: 0; }
+    #quiz-confirm-btn { height: 42px; border-radius: 0; letter-spacing: 1.5px; font-size: 0.9rem; }
+}
